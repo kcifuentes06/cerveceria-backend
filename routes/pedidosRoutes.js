@@ -1,49 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose'); 
-const DireccionDespacho = require('../models/DireccionDespacho');
 const Pedido = require('../models/Pedido');
 const ItemCarrito = require('../models/ItemCarrito');
 const DetallePedido = require('../models/DetallePedido');
-const Producto = require('../models/Producto'); 
+const DireccionDespacho = require('../models/DireccionDespacho');
+const Producto = require('../models/Producto');
+const authMiddleware = require('../middleware/auth'); 
 
-router.get('/direcciones', async (req, res) => {
-    try {
-        const direcciones = await DireccionDespacho.find({ usuario_id: req.usuario_id });
-        res.json(direcciones);
-    } catch (err) {
-        res.status(500).json({ message: 'Error al obtener direcciones.', error: err.message });
-    }
-});
-
-router.post('/direcciones', async (req, res) => {
-    const { _id, etiqueta, rut_receptor, correo_receptor, calle, numero, comuna, region } = req.body;
-    const usuario_id = req.usuario_id;
-
-    try {
-        if (_id) {
-            const direccionActualizada = await DireccionDespacho.findOneAndUpdate(
-                { _id, usuario_id }, 
-                { etiqueta, rut_receptor, correo_receptor, calle, numero, comuna, region }, 
-                { new: true }
-            );
-            if (!direccionActualizada) return res.status(404).json({ message: 'Dirección no encontrada.' });
-            res.json({ message: 'Dirección actualizada con éxito.', direccion: direccionActualizada });
-        } else {
-            const nuevaDireccion = new DireccionDespacho({
-                usuario_id,
-                etiqueta: etiqueta || `${calle} #${numero}`,
-                rut_receptor, correo_receptor, calle, numero, comuna, region
-            });
-            await nuevaDireccion.save();
-            res.status(201).json({ message: 'Nueva dirección guardada con éxito.', direccion: nuevaDireccion });
-        }
-    } catch (err) {
-        res.status(400).json({ message: 'Error al guardar la dirección.', error: err.message });
-    }
-});
-
-router.post('/checkout', async (req, res) => {
+router.post('/checkout', authMiddleware, async (req, res) => {
     const { direccion_despacho_id } = req.body;
     const usuario_id = req.usuario_id;
 
@@ -100,7 +65,7 @@ router.post('/checkout', async (req, res) => {
         await DetallePedido.insertMany(detallesConPedidoId, { session });
 
         await ItemCarrito.deleteMany({ usuario_id }).session(session);
-
+        
         await session.commitTransaction();
         session.endSession();
         
@@ -113,7 +78,52 @@ router.post('/checkout', async (req, res) => {
     } catch (err) {
         await session.abortTransaction();
         session.endSession();
+        console.error('Error durante el checkout:', err);
         res.status(500).json({ message: 'Error al procesar el pedido. Intente nuevamente.', error: err.message });
+    }
+});
+
+router.get('/usuario/historial', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.usuario_id;
+
+        
+        const pedidos = await Pedido.find({ usuario_id: userId })
+            .sort({ fecha_pedido: -1 })
+            .select('-__v')
+            .lean(); 
+
+        if (pedidos.length === 0) {
+            return res.status(200).json([]);
+        }
+
+        const historialCompleto = await Promise.all(pedidos.map(async (pedido) => {
+            
+            const detalles = await DetallePedido.find({ pedido_id: pedido._id })
+                .select('nombre_producto cantidad precio_pagado')
+                .lean();
+
+            const direccion = await DireccionDespacho.findById(pedido.direccion_despacho_id)
+                .select('calle numero comuna region')
+                .lean();
+
+            const fechaFormateada = new Date(pedido.fecha_pedido).toLocaleDateString('es-CL', { 
+                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+            });
+
+            return {
+                ...pedido,
+                detalles: detalles,
+                direccion: direccion,
+                fecha_formateada: fechaFormateada
+            };
+        }));
+
+        res.status(200).json(historialCompleto);
+
+    } catch (error) {
+        console.error('Error al obtener el historial de pedidos:', error);
+        res.status(500).json({ message: 'Error interno del servidor al obtener historial.' });
     }
 });
 
