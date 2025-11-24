@@ -7,10 +7,9 @@ const path = require('path');
 
 dotenv.config();
 
-
-const app = express();
+const app = express(); 
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/cerveceriaDB';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://kevinc06:<db_password>@cluster0.rbwdw9o.mongodb.net/?appName=Cluster0';
 
 
 mongoose.connect(MONGODB_URI)
