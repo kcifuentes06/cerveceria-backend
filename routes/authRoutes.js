@@ -5,6 +5,34 @@ const Usuario = require('../models/Usuario');
 
 const JWT_SECRET = process.env.JWT_SECRET; 
 
+
+async function validateEmailExternally(email) {
+    const apiKey = process.env.EMAIL_VALIDATION_API_KEY;
+    const apiUrl = process.env.EMAIL_VALIDATION_API_URL;
+
+    if (!apiKey || !apiUrl) {
+        console.warn('⚠️ API Key de Validación de Email no configurada. Saltando validación externa.');
+        return true; 
+    }
+
+    try {
+        
+        const response = await fetch(`${apiUrl}?api_key=${apiKey}&email=${email}`);
+        const data = await response.json();
+
+        
+        if (data.status === 'valid' || data.deliverability === 'DELIVERABLE') { 
+            return true;
+        } else {
+            return false;
+        }
+    } catch (error) {
+        console.error('Error al llamar a la API de Validación de Email:', error);
+        
+        return true; 
+    }
+}
+
 const generarToken = (usuario) => {
     return jwt.sign(
         { id: usuario._id, email: usuario.email },
@@ -17,6 +45,12 @@ router.post('/register', async (req, res) => {
     const { nombre, email, password, rut } = req.body;
 
     try {
+        
+        const isEmailValid = await validateEmailExternally(email);
+        if (!isEmailValid) {
+            return res.status(400).json({ message: 'El correo electrónico no es válido o activo. Por favor, verifica tu dirección.' });
+        }
+        
         let usuarioExistente = await Usuario.findOne({ $or: [{ email }, { rut }] });
         if (usuarioExistente) {
             return res.status(400).json({ message: 'El correo o RUT ya están registrados.' });
@@ -29,7 +63,8 @@ router.post('/register', async (req, res) => {
 
         res.status(201).json({ 
             token, 
-            message: 'Registro exitoso. Bienvenido/a.'
+            message: 'Registro exitoso. Bienvenido/a.',
+            usuario: { id: nuevoUsuario._id, nombre: nuevoUsuario.nombre } 
         });
     } catch (error) {
         res.status(500).json({ message: 'Error interno del servidor durante el registro.' });
@@ -62,5 +97,6 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor durante el inicio de sesión.' });
     }
 });
+
 
 module.exports = router;
