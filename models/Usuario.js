@@ -1,44 +1,48 @@
+// En /models/Usuario.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt'); 
+const bcrypt = require('bcryptjs'); // Usamos bcryptjs por compatibilidad
 
 const UsuarioSchema = new mongoose.Schema({
-    nombre: {
-        type: String,
-        required: true,
-        trim: true
+    nombre: { 
+        type: String, 
+        required: true 
     },
-    email: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true,
-        lowercase: true
+
+    email: { 
+        type: String, 
+        required: true, 
+        unique: true 
     },
+
     password: { 
-        type: String,
-        required: true
+        type: String, 
+        required: true 
     },
-    rut: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true
+
+    rut: { 
+        type: String, 
+        required: true, 
+        unique: true 
     },
-    fecha_registro: {
-        type: Date,
-        default: Date.now
+
+    rol: {
+        type: String,
+        enum: ['cliente', 'administrador', 'cajerovirtual', 'encargadodespacho'],
+        default: 'cliente' 
     }
 });
 
 UsuarioSchema.pre('save', async function(next) {
-    if (this.isModified('password')) {
-        this.password = await bcrypt.hash(this.password, 10);
+    if (!this.isModified('password')) {
+        return next();
     }
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
     next();
 });
 
-UsuarioSchema.methods.compararPassword = async function(passwordIngresada) {
-    return await bcrypt.compare(passwordIngresada, this.password);
+UsuarioSchema.methods.compararPassword = function(canditatePassword) {
+    return bcrypt.compare(canditatePassword, this.password);
 };
 
 module.exports = mongoose.model('Usuario', UsuarioSchema);
