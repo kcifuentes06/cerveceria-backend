@@ -12,9 +12,23 @@ const { sendDigitalReceipt } = require('../utils/emailSender');
 const mercadopago = require('mercadopago');
 
 
-mercadopago.configure({
-    access_token: process.env.MERCADOPAGO_ACCESS_TOKEN,
-});
+let mpInstance = mercadopago;
+
+// CRÍTICO: Si el SDK usa un export 'default' (común en versiones modernas),
+// el objeto que contiene 'configure' estará en 'mercadopago.default'.
+if (mpInstance && mpInstance.default) {
+    mpInstance = mpInstance.default;
+}
+
+try {
+    // Intenta la configuración usando el objeto resultante
+    mpInstance.configure({
+        access_token: process.env.MERCADOPAGO_ACCESS_TOKEN,
+    });
+} catch (e) {
+    console.error("❌ ERROR CRÍTICO DE MERCADOPAGO CONFIGURATION:", e.message);
+    console.error("Verifica que tu Access Token esté definido y que el paquete 'mercadopago' esté instalado.");
+}
 
 const checkAdmin = (req, res, next) => {
     if (req.usuario_id) { 
