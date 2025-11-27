@@ -1,6 +1,5 @@
-// En /models/Usuario.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs'); // Usamos bcryptjs por compatibilidad
+const bcrypt = require('bcryptjs');
 
 const UsuarioSchema = new mongoose.Schema({
     nombre: { 

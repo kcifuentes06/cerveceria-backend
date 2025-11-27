@@ -60,8 +60,8 @@ router.get('/', async (req, res) => {
 
 router.get('/admin', authMiddleware, checkAdmin, async (req, res) => {
     try {
-        // Lógica para obtener todos los productos sin filtros
-        const productos = await Producto.find({}); // Usar find({}) para asegurar que no haya filtros residuales
+        
+        const productos = await Producto.find({}); 
         res.json(productos);
     } catch (error) {
         console.error('Error al obtener productos para admin:', error);
