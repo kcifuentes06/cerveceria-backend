@@ -14,14 +14,12 @@ const mercadopago = require('mercadopago');
 
 let mpInstance = mercadopago;
 
-// CRÍTICO: Si el SDK usa un export 'default' (común en versiones modernas),
-// el objeto que contiene 'configure' estará en 'mercadopago.default'.
 if (mpInstance && mpInstance.default) {
     mpInstance = mpInstance.default;
 }
 
 try {
-    // Intenta la configuración usando el objeto resultante
+    
     mpInstance.configure({
         access_token: process.env.MERCADOPAGO_ACCESS_TOKEN,
     });
