@@ -58,5 +58,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor Express funcionando en http://localhost:${PORT}`);
+    console.log('Servidor Express funcionando en http://localhost:${PORT}');
 });

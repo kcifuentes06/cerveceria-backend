@@ -26,7 +26,7 @@ try {
         access_token: process.env.MERCADOPAGO_ACCESS_TOKEN,
     });
 } catch (e) {
-    console.error("❌ ERROR CRÍTICO DE MERCADOPAGO CONFIGURATION:", e.message);
+    console.error("ERROR CRÍTICO DE MERCADOPAGO CONFIGURATION:", e.message);
     console.error("Verifica que tu Access Token esté definido y que el paquete 'mercadopago' esté instalado.");
 }
 
