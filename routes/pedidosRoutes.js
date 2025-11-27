@@ -315,4 +315,26 @@ router.get('/reporte-ventas', authMiddleware, checkAdmin, async (req, res) => {
     }
 });
 
+router.get('/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const userId = req.usuario_id;
+    
+    try {
+        
+        const pedido = await Pedido.findOne({ _id: id, usuario_id: userId })
+            .select('total_pedido estado fecha_pedido')
+            .lean();
+
+        if (!pedido) {
+            return res.status(404).json({ message: 'Pedido no encontrado o no autorizado.' });
+        }
+        
+        res.status(200).json(pedido);
+
+    } catch (error) {
+        console.error('Error al obtener detalles del pedido:', error);
+        res.status(500).json({ message: 'Error interno al obtener el pedido.' });
+    }
+});
+
 module.exports = router;

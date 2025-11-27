@@ -5,9 +5,25 @@ const ItemCarrito = require('../models/ItemCarrito');
 router.get('/', async (req, res) => {
     try {
         const items = await ItemCarrito.find({ usuario_id: req.usuario_id }).populate('producto_id');
-        res.json(items);
+        
+        let totalCalculado = 0;
+        
+        // Calcular el total a partir de los ítems
+        items.forEach(item => {
+            // Se asume que item.precio_unitario es el precio pagado por unidad
+            totalCalculado += item.cantidad * item.precio_unitario;
+        });
+
+        // CRÍTICO: Devolver un objeto estructurado que incluye la lista de items Y el total
+        res.json({
+            items: items,
+            total: totalCalculado, // <-- Asegura que esta propiedad exista
+            count: items.length
+        });
+        
     } catch (err) {
-        res.status(500).json({ message: 'Error al obtener el carrito.', error: err.message });
+        // Devuelve 500 si Mongoose falla, pero el frontend ahora mostrará 'Error al cargar'
+        res.status(500).json({ message: 'Error al obtener el carrito y calcular el total.', error: err.message });
     }
 });
 

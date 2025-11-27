@@ -10,6 +10,10 @@ const DireccionDespachoSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    nombre_receptor: {
+        type: String,
+        required: true
+    },
     rut_receptor: {
         type: String,
         required: true

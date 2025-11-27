@@ -1,131 +1,110 @@
+// En /routes/direccionesRoutes.js
+
 const express = require('express');
 const router = express.Router();
-const DireccionDespacho = require('../models/DireccionDespacho');
+const DireccionDespacho = require('../models/DireccionDespacho'); 
 
-router.post('/', async (req, res) => {
-    const usuario_id = req.usuario_id;
-    const { 
-        etiqueta, 
-        rut_receptor, 
-        correo_receptor, 
-        calle, 
-        numero, 
-        comuna, 
-        region 
-    } = req.body;
+// NOTA: Asumimos que estas rutas están protegidas por 'authMiddleware' en server.js
+// y que 'req.usuario_id' es inyectado por el middleware de autenticación.
 
-    if (!calle || !numero || !comuna || !region || !rut_receptor || !correo_receptor || !etiqueta) {
-        return res.status(400).json({ message: 'Todos los campos de la dirección son obligatorios.' });
-    }
 
-    try {
-        
-        const count = await DireccionDespacho.countDocuments({ usuario_id });
-        const es_principal = count === 0 ? true : false; 
-
-        const nuevaDireccion = new DireccionDespacho({
-            usuario_id,
-            etiqueta,
-            rut_receptor,
-            correo_receptor,
-            calle,
-            numero,
-            comuna,
-            region,
-            es_principal
-        });
-
-        const direccionGuardada = await nuevaDireccion.save();
-        res.status(201).json({ 
-            message: 'Dirección guardada exitosamente.', 
-            direccion: direccionGuardada 
-        });
-
-    } catch (error) {
-        console.error('Error al crear dirección:', error);
-        res.status(500).json({ message: 'Error interno del servidor al guardar la dirección.' });
-    }
-});
-
+// =========================================================
+// RUTA 1: OBTENER TODAS LAS DIRECCIONES DEL USUARIO (LISTAR)
+// GET /api/direcciones 
+// =========================================================
 router.get('/', async (req, res) => {
-    const usuario_id = req.usuario_id;
-
     try {
-        const direcciones = await DireccionDespacho.find({ usuario_id }).sort({ es_principal: -1, _id: 1 });
-        
-        if (direcciones.length === 0) {
-            return res.status(200).json({ message: 'No tienes direcciones guardadas.', direcciones: [] });
-        }
-
-        res.status(200).json(direcciones);
-
+        // Busca todas las direcciones asociadas al usuario logueado (req.usuario_id)
+        const direcciones = await DireccionDespacho.find({ usuario_id: req.usuario_id });
+        res.json(direcciones);
     } catch (error) {
         console.error('Error al obtener direcciones:', error);
-        res.status(500).json({ message: 'Error interno del servidor.' });
+        res.status(500).json({ message: 'Error interno al obtener direcciones.', error: error.message });
     }
 });
 
-router.put('/principal/:id', async (req, res) => {
-    const { id } = req.params;
-    const usuario_id = req.usuario_id;
-    
+
+// =========================================================
+// RUTA 2: CREAR UNA NUEVA DIRECCIÓN
+// POST /api/direcciones 
+// =========================================================
+router.post('/', async (req, res) => {
     try {
+        // Al usar el spread operator (...req.body), se incluyen todos los campos enviados,
+        // incluyendo 'nombre_receptor', 'rut_receptor', 'calle', etc.
+        const nuevaDireccion = new DireccionDespacho({
+            ...req.body,
+            usuario_id: req.usuario_id // Asocia la dirección al ID del usuario logueado
+        });
         
-        await DireccionDespacho.updateMany(
-            { usuario_id, es_principal: true },
-            { $set: { es_principal: false } }
+        const direccionGuardada = await nuevaDireccion.save();
+        res.status(201).json({ 
+            message: 'Dirección guardada con éxito.', 
+            direccion: direccionGuardada 
+        });
+        
+    } catch (error) {
+        console.error('Error al guardar dirección:', error);
+        // Si Mongoose falla la validación (por ejemplo, si falta el campo nombre_receptor),
+        // devuelve un 400 Bad Request.
+        res.status(400).json({ 
+            message: 'Datos incompletos o inválidos para guardar la dirección. Verifique la información.', 
+            error: error.message 
+        });
+    }
+});
+
+
+// =========================================================
+// RUTA 3: ACTUALIZAR DIRECCIÓN POR ID (OPCIONAL/CRUD COMPLETO)
+// PUT /api/direcciones/:id
+// =========================================================
+router.put('/:id', async (req, res) => {
+    const { id } = req.params;
+    const userId = req.usuario_id; 
+
+    try {
+        // Actualiza solo si la dirección pertenece al usuario logueado
+        const direccionActualizada = await DireccionDespacho.findOneAndUpdate(
+            { _id: id, usuario_id: userId },
+            req.body,
+            { new: true, runValidators: true } // new: devuelve el documento actualizado; runValidators: valida antes de actualizar
         );
 
-        
-        const direccionPrincipal = await DireccionDespacho.findOneAndUpdate(
-            { _id: id, usuario_id },
-            { $set: { es_principal: true } },
-            { new: true }
-        );
-
-        if (!direccionPrincipal) {
-            return res.status(404).json({ message: 'Dirección no encontrada.' });
+        if (!direccionActualizada) {
+            return res.status(404).json({ message: 'Dirección no encontrada o no autorizada.' });
         }
 
-        res.json({ 
-            message: 'Dirección establecida como principal.', 
-            direccion: direccionPrincipal 
-        });
+        res.json({ message: 'Dirección actualizada con éxito.', direccion: direccionActualizada });
 
     } catch (error) {
-        console.error('Error al establecer dirección principal:', error);
-        res.status(500).json({ message: 'Error interno del servidor.' });
+        console.error('Error al actualizar dirección:', error);
+        res.status(400).json({ message: 'Error al actualizar la dirección.', error: error.message });
     }
 });
+
 
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
-    const usuario_id = req.usuario_id;
+    const userId = req.usuario_id;
 
     try {
-        const resultado = await DireccionDespacho.findOneAndDelete({ _id: id, usuario_id });
-
-        if (!resultado) {
-            return res.status(404).json({ message: 'Dirección no encontrada o no pertenece al usuario.' });
-        }
         
-        if (resultado.es_principal) {
-            const nuevaPrincipal = await DireccionDespacho.findOneAndUpdate(
-                { usuario_id },
-                { $set: { es_principal: true } },
-                { sort: { _id: 1 }, new: true }
-            );
-            if(nuevaPrincipal) {
-                console.log(`Nueva principal asignada: ${nuevaPrincipal._id}`);
-            }
+        const direccionEliminada = await DireccionDespacho.findOneAndDelete(
+            { _id: id, usuario_id: userId }
+        );
+
+        if (!direccionEliminada) {
+            return res.status(404).json({ message: 'Dirección no encontrada o no autorizada para eliminar.' });
         }
 
-        res.json({ message: 'Dirección eliminada correctamente.' });
+        res.json({ message: 'Dirección eliminada con éxito.' });
 
     } catch (error) {
         console.error('Error al eliminar dirección:', error);
-        res.status(500).json({ message: 'Error interno del servidor.' });
+        res.status(500).json({ message: 'Error interno al eliminar la dirección.', error: error.message });
     }
 });
+
 
 module.exports = router;

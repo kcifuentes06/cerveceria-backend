@@ -15,24 +15,46 @@ const checkAdmin = (req, res, next) => {
 
 router.get('/', async (req, res) => {
     try {
+        const { tipo, variedad, search } = req.query; 
+        
+        
         const filtros = {};
-        if (req.query.tipo && req.query.tipo !== 'todos') filtros.tipo = req.query.tipo;
-        if (req.query.variedad && req.query.variedad !== 'todas') filtros.variedad = req.query.variedad;
 
+        
         filtros.stock = { $gt: 0 }; 
+
+        
+        if (tipo && tipo !== 'todos') {
+            filtros.tipo = tipo;
+        }
+        
+        
+        if (variedad && variedad !== 'todas') {
+            filtros.variedad = { 
+                $regex: variedad, 
+                $options: 'i' 
+            };
+        }
+        
+        
+        if (search) {
+            const regexQuery = { $regex: search, $options: 'i' }; 
+            
+            
+            filtros.$or = [
+                { nombre: regexQuery },
+                { descripcion: regexQuery }
+            ];
+            
+
+        }
 
         const productos = await Producto.find(filtros); 
         res.json(productos);
+
     } catch (err) {
-        res.status(500).json({ message: 'Error al obtener productos.', error: err.message });
-    }
-});
-router.get('/admin', authMiddleware, checkAdmin, async (req, res) => {
-    try {
-        const productos = await Producto.find({});
-        res.json(productos);
-    } catch (err) {
-        res.status(500).json({ message: 'Error al obtener productos para administración.', error: err.message });
+        console.error("Error al obtener productos con filtros:", err);
+        res.status(500).json({ message: 'Error interno al obtener productos.', error: err.message });
     }
 });
 
